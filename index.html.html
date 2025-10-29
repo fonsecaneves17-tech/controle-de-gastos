@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Controle de Gastos</title>
+  <style>
+    :root{
+      --bg:#f6f8fb; --card:#ffffff; --muted:#6b7280; --accent:#2563eb; --success:#10b981; --danger:#ef4444; --glass: rgba(255,255,255,0.6);
+      --shadow: 0 6px 18px rgba(16,24,40,0.06);
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#f8fbff 0%, var(--bg) 100%);color:#0f172a}
+    .container{max-width:1100px;margin:28px auto;padding:20px}
+
+    header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:18px}
+    header h1{margin:0;font-size:20px}
+    .controls{display:flex;gap:8px;align-items:center}
+
+    .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:var(--shadow);}
+    .form-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}
+    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    input[type=text], input[type=number], select{width:100%;padding:10px;border-radius:8px;border:1px solid #e6e9ee;background:transparent}
+    .field{grid-column:span 4}
+    .field--wide{grid-column:span 6}
+    .field--full{grid-column:span 12}
+    .row{display:flex;gap:8px;align-items:center}
+
+    button{background:var(--accent);color:white;border:none;padding:10px 14px;border-radius:10px;cursor:pointer}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid rgba(37,99,235,0.12)}
+    table{width:100%;border-collapse:collapse;margin-top:14px}
+    th,td{padding:12px 10px;text-align:left;border-bottom:1px solid #f1f5f9;font-size:14px}
+    th{color:var(--muted);font-weight:600}
+    .muted{color:var(--muted);font-size:13px}
+
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;font-size:13px}
+    .status-pago{background:rgba(16,185,129,0.12);color:var(--success)}
+    .status-devendo{background:rgba(239,68,68,0.08);color:var(--danger)}
+    .status-aguardando{background:rgba(245,158,11,0.08);color:#f59e0b}
+    .status-prox{background:rgba(99,102,241,0.06);color:#6366f1}
+
+    .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+    .summary .s-card{padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.7),var(--card));box-shadow:var(--shadow)}
+    .s-val{font-weight:700;font-size:18px}
+    .actions{display:flex;gap:8px}
+
+    @media (max-width:900px){.field{grid-column:span 6}.field--wide{grid-column:span 12}.summary{grid-template-columns:repeat(2,1fr)}}
+    @media (max-width:520px){header{flex-direction:column;align-items:flex-start;gap:10px}.form-grid{grid-template-columns:repeat(6,1fr)}
+      .field{grid-column:span 6}.field--wide{grid-column:span 6}.summary{grid-template-columns:1fr}}
+
+    /* small helpers */
+    .text-right{text-align:right}
+    .muted-small{color:#94a3b8;font-size:12px}
+    .btn-icon{background:transparent;border:none;cursor:pointer;padding:6px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Controle de Gastos</h1>
+      <div class="controls">
+        <label class="muted-small" for="monthSelect">Mês</label>
+        <select id="monthSelect"></select>
+        <button id="clearAll" class="ghost">Limpar dados</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <form id="expenseForm" onsubmit="return false;">
+        <div class="form-grid">
+          <div class="field">
+            <label>Categoria</label>
+            <input id="categoria" type="text" placeholder="Ex: Faculdade, Cartão" required />
+          </div>
+          <div class="field">
+            <label>Descrição</label>
+            <input id="descricao" type="text" placeholder="Descrição do gasto" />
+          </div>
+
+          <div class="field">
+            <label>Tipo</label>
+            <select id="tipo">
+              <option value="fixo">Fixo</option>
+              <option value="parcelado">Parcelado</option>
+            </select>
+          </div>
+
+          <div class="field" id="parcelasWrap" style="display:none">
+            <label>Parcelas</label>
+            <input id="parcelas" type="number" min="1" value="1" />
+          </div>
+
+          <div class="field--wide">
+            <label>Valor (R$)</label>
+            <input id="valor" type="number" step="0.01" min="0" placeholder="0.00" required />
+          </div>
+
+          <div class="field">
+            <label>Status</label>
+            <select id="status">
+              <option value="Devendo">Devendo</option>
+              <option value="Pago">Pago</option>
+              <option value="Aguardando Pagamento">Aguardando Pagamento</option>
+              <option value="Pagar no Próximo Mês">Pagar no Próximo Mês</option>
+            </select>
+          </div>
+
+          <div class="field--full row" style="margin-top:8px;justify-content:flex-end">
+            <div class="actions">
+              <button id="btnAdd">Adicionar Gasto</button>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <table id="tableGastos">
+        <thead>
+          <tr><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Status</th><th>Tipo</th><th>Ações</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="summary" id="summary">
+        <div class="s-card">
+          <div class="muted-small">Total de Gastos</div>
+          <div class="s-val" id="totalGastos">R$ 0,00</div>
+        </div>
+        <div class="s-card">
+          <div class="muted-small">Total Pago</div>
+          <div class="s-val" id="totalPago">R$ 0,00</div>
+        </div>
+        <div class="s-card">
+          <div class="muted-small">Total Pendente</div>
+          <div class="s-val" id="totalPendente">R$ 0,00</div>
+        </div>
+        <div class="s-card">
+          <div class="muted-small">Aguardando Pagamento</div>
+          <div class="s-val" id="totalAguardando">R$ 0,00</div>
+        </div>
+      </div>
+    </section>
+
+    <p class="muted" style="margin-top:10px">Dica: para parcelas, o sistema cria lançamentos mensais automáticos a partir do mês selecionado.</p>
+  </div>
+
+<script>
+  // LocalStorage key
+  const DB_KEY = 'gastosDB_v1';
+
+  // state
+  let db = { items: [] };
+  let editingId = null;
+
+  const monthSelect = document.getElementById('monthSelect');
+  const categoria = document.getElementById('categoria');
+  const descricao = document.getElementById('descricao');
+  const tipo = document.getElementById('tipo');
+  const parcelasWrap = document.getElementById('parcelasWrap');
+  const parcelas = document.getElementById('parcelas');
+  const valor = document.getElementById('valor');
+  const status = document.getElementById('status');
+  const btnAdd = document.getElementById('btnAdd');
+  const tableBody = document.querySelector('#tableGastos tbody');
+
+  // init months
+  const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  monthNames.forEach((m,i)=>{const opt=document.createElement('option');opt.value=i;opt.textContent=m;monthSelect.appendChild(opt)});
+  const today = new Date();
+  monthSelect.value = today.getMonth();
+
+  // events
+  tipo.addEventListener('change',()=>{parcelasWrap.style.display = tipo.value==='parcelado'? 'block':'none';});
+  btnAdd.addEventListener('click',onAdd);
+  monthSelect.addEventListener('change',render);
+  document.getElementById('clearAll').addEventListener('click',()=>{if(confirm('Limpar todos os dados?')){localStorage.removeItem(DB_KEY);db={items:[]};render();}})
+
+  // load db
+  function load(){
+    const raw = localStorage.getItem(DB_KEY);
+    if(raw){ try{ db = JSON.parse(raw) }catch(e){db={items:[]}} }
+  }
+  function save(){ localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+
+  function currency(v){ return 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+  function onAdd(){
+    const cat = categoria.value.trim();
+    const desc = descricao.value.trim();
+    const tp = tipo.value;
+    const par = Math.max(1,parseInt(parcelas.value||1));
+    const val = parseFloat(valor.value||0);
+    const stat = status.value;
+    const month = parseInt(monthSelect.value);
+    if(!cat || isNaN(val) || val<=0){ alert('Preencha categoria e valor válidos.'); return }
+
+    if(editingId){ // salvar edição
+      const item = db.items.find(x=>x.id===editingId);
+      if(item){ item.categoria=cat; item.descricao=desc; item.tipo=tp; item.parcelas=par; item.valor=val; item.status=stat; item.month=month; save(); editingId=null; btnAdd.textContent='Adicionar Gasto'; clearForm(); render(); }
+      return;
+    }
+
+    if(tp==='parcelado' && par>1){
+      // cria lançamentos mensais a partir do mês selecionado
+      const parcelaValor = +(val/par).toFixed(2);
+      for(let i=0;i<par;i++){
+        const m = (month + i) % 12;
+        const n = Math.floor((month + i)/12);
+        const id = 'g'+Date.now()+Math.random().toString(36).slice(2,8);
+        db.items.push({ id, categoria:cat, descricao: desc + ` (${i+1}/${par})`, tipo:tp, parcelas:par, valor:parcelaValor, status:stat, month:m, year: today.getFullYear() + n });
+      }
+    } else {
+      const id = 'g'+Date.now()+Math.random().toString(36).slice(2,8);
+      db.items.push({ id, categoria:cat, descricao:desc, tipo:tp, parcelas:1, valor: +val, status:stat, month:month, year: today.getFullYear() });
+    }
+
+    save(); clearForm(); render();
+  }
+
+  function clearForm(){ categoria.value=''; descricao.value=''; tipo.value='fixo'; parcelas.value='1'; parcelasWrap.style.display='none'; valor.value=''; status.value='Devendo'; }
+
+  function render(){
+    load();
+    const selMonth = parseInt(monthSelect.value);
+    tableBody.innerHTML='';
+    const items = db.items.filter(it=>it.month===selMonth);
+    if(items.length===0){ const tr=document.createElement('tr'); const td=document.createElement('td'); td.colSpan=6; td.className='muted-small'; td.textContent='Nenhum gasto para este mês.'; tr.appendChild(td); tableBody.appendChild(tr); }
+    else{
+      items.sort((a,b)=>a.categoria.localeCompare(b.categoria)||a.descricao.localeCompare(b.descricao));
+      items.forEach(it=>{
+        const tr=document.createElement('tr');
+        const tdCat=document.createElement('td'); tdCat.textContent=it.categoria; tr.appendChild(tdCat);
+        const tdDesc=document.createElement('td'); tdDesc.textContent=it.descricao || '-'; tr.appendChild(tdDesc);
+        const tdVal=document.createElement('td'); tdVal.textContent=currency(it.valor); tr.appendChild(tdVal);
+        const tdStatus=document.createElement('td');
+        const span=document.createElement('span'); span.className='pill '+statusClass(it.status); span.textContent=it.status; tdStatus.appendChild(span);
+        // status change select
+        const sel=document.createElement('select'); sel.style.marginLeft='8px'; sel.innerHTML = '<option value="Devendo">Devendo</option><option value="Pago">Pago</option><option value="Aguardando Pagamento">Aguardando Pagamento</option><option value="Pagar no Próximo Mês">Pagar no Próximo Mês</option>';
+        sel.value = it.status; sel.addEventListener('change',()=>{ changeStatus(it.id, sel.value); });
+        tdStatus.appendChild(sel);
+        tr.appendChild(tdStatus);
+
+        const tdTipo=document.createElement('td'); tdTipo.textContent = it.tipo + (it.parcelas>1? ' ('+it.parcelas+')':''); tr.appendChild(tdTipo);
+
+        const tdA=document.createElement('td');
+        const btnEdit=document.createElement('button'); btnEdit.className='btn-icon'; btnEdit.title='Editar'; btnEdit.innerHTML='✏️'; btnEdit.addEventListener('click',()=>{startEdit(it.id)});
+        const btnDel=document.createElement('button'); btnDel.className='btn-icon'; btnDel.title='Excluir'; btnDel.innerHTML='🗑️'; btnDel.addEventListener('click',()=>{ if(confirm('Excluir este gasto?')){ deleteItem(it.id); } });
+        tdA.appendChild(btnEdit); tdA.appendChild(btnDel); tr.appendChild(tdA);
+
+        tableBody.appendChild(tr);
+      })
+    }
+    updateSummary(selMonth);
+  }
+
+  function statusClass(st){ if(st==='Pago') return 'status-pago'; if(st==='Devendo') return 'status-devendo'; if(st==='Aguardando Pagamento') return 'status-aguardando'; if(st==='Pagar no Próximo Mês') return 'status-prox'; return '' }
+
+  function changeStatus(id,newStatus){ const it = db.items.find(x=>x.id===id); if(it){ it.status=newStatus; save(); render(); } }
+  function deleteItem(id){ db.items = db.items.filter(x=>x.id!==id); save(); render(); }
+
+  function startEdit(id){ const it = db.items.find(x=>x.id===id); if(!it) return; editingId = id; categoria.value = it.categoria; descricao.value = it.descricao.replace(/\s*\(\d+\/\d+\)\s*$/,''); tipo.value = it.tipo; parcelas.value = it.parcelas||1; parcelasWrap.style.display = it.tipo==='parcelado' ? 'block' : 'none'; valor.value = it.valor; status.value = it.status; monthSelect.value = it.month; btnAdd.textContent='Salvar alteração'; window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  function updateSummary(selMonth){ const items = db.items.filter(it=>it.month===selMonth);
+    const total = items.reduce((s,i)=>s + Number(i.valor||0),0);
+    const totalPago = items.filter(i=>i.status==='Pago').reduce((s,i)=>s + Number(i.valor||0),0);
+    const totalAguardando = items.filter(i=>i.status==='Aguardando Pagamento').reduce((s,i)=>s + Number(i.valor||0),0);
+    const totalPendente = items.filter(i=>i.status==='Devendo' || i.status==='Pagar no Próximo Mês').reduce((s,i)=>s + Number(i.valor||0),0);
+    document.getElementById('totalGastos').textContent = currency(total);
+    document.getElementById('totalPago').textContent = currency(totalPago);
+    document.getElementById('totalPendente').textContent = currency(totalPendente);
+    document.getElementById('totalAguardando').textContent = currency(totalAguardando);
+  }
+
+  // initial
+  load(); render();
+</script>
+</body>
+</html>
